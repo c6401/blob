@@ -1,0 +1,102 @@
+#!/usr/bin/env -S uv run --python=3.10 --with=fire --with=xonsh xonsh
+__import__('warnings').filterwarnings("ignore", category=DeprecationWarning)
+
+import fire as _fire
+import platform as _platform
+from textwrap import _dedent
+
+_PLATFORM = _platform.system().lower()
+
+# ///////////////
+# //// UTILS ////
+# ///////////////
+
+def clip():
+    # brew install tcl-tk
+    from tkinter import Tk
+
+    tk = Tk()
+    clip = tk.clipboard_get()
+    tk.destroy()
+    return clip
+
+# /////////////////////
+# //// CODE SERVER ////
+# /////////////////////
+
+def llama_code_server():
+    llama-server -hf ggml-org/Qwen2.5-Coder-3B-Q8_0-GGUF --port 8012 -ngl 99 -fa -ub 1024 -b 1024 --ctx-size 0 --cache-reuse 256
+
+copilot = llama_code_server
+
+# /////////////////
+# //// YOUTUBE ////
+# /////////////////
+
+def _youtube_url_code(url: str):
+    if not url.startswith("https://"):
+        code = url
+        url = f"https://www.youtube.com/watch?v={url}"
+    else:
+        code = url.split("v=")[-1]
+    return url, code
+
+def youtube_download(url: str):
+    """download youtube video.
+    $ blob yt-get <youtube id or url>
+    """
+    url, code = self._youtube_url_code(url)
+
+    uvx yt-dlp f"{url}"
+
+yt_get = youtube_download
+
+# ///////////////
+# //// SOUND ////
+# ///////////////
+
+def kokoro(speed=1):
+    # https://huggingface.co/hexgrad/Kokoro-82M#usage
+    # FIXME afplay is for mac
+    cd /tmp
+    uv run \
+        --with kokoro \
+        --with soundfile \
+        python -c @(_dedent(f'''
+            from kokoro import KPipeline
+            import soundfile as sf
+            import sys
+            import subprocess
+
+            text = sys.stdin.buffer.read().decode('utf8', errors="replace")
+
+            # 🇺🇸 'a' => American English, 🇬🇧 'b' => British English
+            # 🇯🇵 'j' => Japanese: pip install misaki[ja]
+            # 🇨🇳 'z' => Mandarin Chinese: pip install misaki[zh]
+            pipeline = KPipeline(lang_code='c')
+
+            generator = pipeline(
+                text,
+                voice='af_heart',  # <= change voice here
+                speed={speed}, split_pattern=r'\\n\\n\\n+'
+            )
+            p = None
+            for i, (gs, ps, audio) in enumerate(generator):
+                p and p.wait()
+                print(i)  # i => index
+                print(gs) # gs => graphemes/text
+                print(ps) # ps => phonemes
+                sf.write(f'_.wav', audio, 24000)
+                p = subprocess.Popen(['afplay', f'_.wav'])
+        '''))
+
+# ///////////////////////////
+# //// SEMANTIC COMMANDS ////
+# ///////////////////////////
+say = kokoro
+
+def describe(prompt, image):
+    visual_model(prompt, image)
+
+if __name__ == "__main__":
+    _fire.Fire()
