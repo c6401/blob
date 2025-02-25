@@ -1,9 +1,8 @@
 #!/usr/bin/env -S uv run --python=3.10 --with=fire --with=xonsh xonsh
 __import__('warnings').filterwarnings("ignore", category=DeprecationWarning)
-
 import fire as _fire
 import platform as _platform
-from textwrap import _dedent
+from textwrap import dedent as _dedent
 
 _PLATFORM = _platform.system().lower()
 
@@ -70,10 +69,9 @@ def kokoro(speed=1):
 
             text = sys.stdin.buffer.read().decode('utf8', errors="replace")
 
-            # 🇺🇸 'a' => American English, 🇬🇧 'b' => British English
-            # 🇯🇵 'j' => Japanese: pip install misaki[ja]
-            # 🇨🇳 'z' => Mandarin Chinese: pip install misaki[zh]
-            pipeline = KPipeline(lang_code='c')
+            # 'a': 'American English', 'b': 'British English', 'e': 'es', 'f': 'fr-fr', 'h': 'hi', 'i': 'it', 
+            # 'p': 'pt-br', 'j': 'Japanese', 'z': 'Mandarin Chinese'
+            pipeline = KPipeline(lang_code='a')
 
             generator = pipeline(
                 text,
