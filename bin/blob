@@ -79,17 +79,60 @@ def youtube_download(url: str):
     """download youtube video.
     $ blob yt-get <youtube id or url>
     """
-    url, code = self._youtube_url_code(url)
+    url, code = _youtube_url_code(url)
 
     uvx yt-dlp f"{url}"
 
 yt_get = youtube_download
 
-# ///////////////
-# //// SOUND ////
-# ///////////////
+def youtube_get_audio(url: str, format: str = 'mp3'):
+    url, code = _youtube_url_code(url)
+    uvx yt-dlp -x --audio-format f'{format}' f'{quality_param}' f'{url}'
+
+yt_au = youtube_get_audio
+
+# /////////////
+# //// STT ////
+# /////////////
+
+def whisper_cpp(file):
+    cd /tmp
+    wget --continue https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+    ffmpeg -y -i @(file) -ar 16000 /tmp/recog.wav 2>/dev/null
+
+    uv run \
+        --with whisper-cpp-python \
+        --python=3.12 \
+            python -c @(_dedent(f'''
+                import os
+                import pkgutil
+                from pathlib import Path
+                try:
+                    import whisper_cpp_python
+                except FileNotFoundError:
+                    package = pkgutil.get_loader("whisper_cpp_python")
+                    whisper_path = Path(package.path)
+                    old = whisper_path.parent / "whisper_cpp.py"
+                    new = old.read_text().replace(
+                        'elif sys.platform == "darwin":\\n        lib_ext = ".so"',
+                        'elif sys.platform == "darwin":\\n        lib_ext = ".dylib"',
+                    )
+                    old.write_text(new)
+                import whisper_cpp_python
+                from whisper_cpp_python import Whisper
+                whisper = Whisper(model_path="/tmp/ggml-tiny.bin")
+                output = whisper.transcribe(open('recog.wav', 'rb'))
+                print(output['text'])
+            '''))
+
+# /////////////
+# //// TTS ////
+# /////////////
 
 def kokoro(speed=1):
+    """
+    echo 'this is a text' | blob kokoro 
+    """
     # https://huggingface.co/hexgrad/Kokoro-82M#usage
     # FIXME afplay is for mac
     cd /tmp
@@ -126,7 +169,8 @@ def kokoro(speed=1):
 # ///////////////////////////
 # //// SEMANTIC COMMANDS ////
 # ///////////////////////////
-say = kokoro
+say = read = tts = kokoro
+stt = whisper_cpp
 
 def describe(prompt, image):
     visual_model(prompt, image)
