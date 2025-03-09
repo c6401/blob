@@ -13,6 +13,9 @@ _PLATFORM = _platform.system().lower()
 # ///////////////
 
 def clip():
+    ''' Return clipboard contents.
+    $ blob clip
+    '''
     # brew install tcl-tk
     from tkinter import Tk
 
@@ -96,6 +99,9 @@ yt_au = youtube_get_audio
 # /////////////
 
 def whisper_cpp(file):
+    ''' Recognize audio
+    $ blob whisper-cpp <file>
+    '''
     cd /tmp
     wget --continue https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
     ffmpeg -y -i @(file) -ar 16000 /tmp/recog.wav 2>/dev/null
@@ -131,7 +137,7 @@ def whisper_cpp(file):
 
 def kokoro(speed=1):
     """
-    echo 'this is a text' | blob kokoro 
+    $ echo 'this is a text' | blob kokoro 
     """
     # https://huggingface.co/hexgrad/Kokoro-82M#usage
     # FIXME afplay is for mac
@@ -166,9 +172,18 @@ def kokoro(speed=1):
                 p = subprocess.Popen(['afplay', f'_.wav'])
         '''))
 
+# ///////////////////
+# //// FRONTENDS ////
+# ///////////////////
+
+def openwebui()
+    uvx --python 3.11 open-webui serve
+
+
 # ///////////////////////////
 # //// SEMANTIC COMMANDS ////
 # ///////////////////////////
+
 say = read = tts = kokoro
 stt = whisper_cpp
 
