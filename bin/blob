@@ -117,8 +117,11 @@ def youtube_download(url: str):
 yt_get = youtube_download
 
 def youtube_get_audio(url: str, format: str = 'mp3'):
+    """download youtube audio.
+    $ blob yt-au <youtube id or url> <format=mp3>
+    """
     url, code = _youtube_url_code(url)
-    uvx yt-dlp -x --audio-format f'{format}' f'{quality_param}' f'{url}'
+    uvx yt-dlp -x --audio-format f'{format}' f'{url}'
 
 yt_au = youtube_get_audio
 
@@ -158,6 +161,15 @@ def whisper_cpp(file):
                 output = whisper.transcribe(open('recog.wav', 'rb'))
                 print(output['text'])
             '''))
+
+def whisper_mlx(file):  # not tested
+    ''' Recognize audio
+    $ blob whisper-mlx <file>
+    '''
+    cd /tmp
+    #ffmpeg -y -i @(file) -ar 16000 /tmp/recog.wav 2>/dev/null
+
+    uv run --with mlx-whisper mlx_whisper f"{file}"
 
 # /////////////
 # //// TTS ////
