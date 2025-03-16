@@ -1,6 +1,7 @@
-#!/usr/bin/env -S uv run --python=3.10 --with=fire --with=xonsh xonsh
+#!/usr/bin/env -S uv run --python=3.12 --with=fire --with=xonsh xonsh
+"""AI Blob - A collection of AI tools for small tasks."""
 $XONSH_SHOW_TRACEBACK = True
-__import__('warnings').filterwarnings("ignore", category=DeprecationWarning)
+__import__('warnings').filterwarnings("ignore")
 
 import fire as _fire
 import platform as _platform
@@ -23,6 +24,17 @@ def clip():
     clip = tk.clipboard_get()
     tk.destroy()
     return clip
+
+def play(file):
+    ''' Play audio file.
+    $ blob play <file>
+    '''
+    if _PLATFORM == 'darwin':
+        afplay @(file)
+    elif _PLATFORM == 'linux':
+        aplay @(file)
+    elif _PLATFORM == 'windows':
+        powershell -c f"(New-Object Media.SoundPlayer {file}).PlaySync()"
 
 # ///////////////////////
 # //// VISUAL MODELS ////
@@ -52,37 +64,45 @@ def qwenvl_mlx_ocr(image):
 
 ocr = qwenvl_mlx_ocr
 
-# ////////////////////
-# //// AUTOMATION ////
-# ////////////////////
+def omni(url='https://github.com/microsoft/OmniParser/blob/master/requirements.txt'):
+    # https://github.com/microsoft/OmniParser/blob/master/requirements.txt
 
-def browser_use(command="Go to Reddit, search for 'browser-use', click on the first post and return the first comment."):
-    # https://github.com/browser-use/browser-use
     cd /tmp
-
+    # '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --screenshot=/tmp/shot1.png f'{url}'
     uv run \
         --python=3.12 \
-        --with browser-use \
-            python -c @(_dedent(f'''
-                from langchain_openai import ChatOpenAI
-                from browser_use import Agent
-                import asyncio
+        --with Pillow \
+        --with 'git+https://github.com/microsoft/OmniParser/tree/master' \
+        --no-project --with-requirements requirements.txt \
+            python -c @(_dedent('''
+                from util.utils import get_som_labeled_img, check_ocr_box, get_caption_model_processor, get_yolo_model
+
                 import os
+                from PIL import Image
 
-                os.system('playwright install')
+                image_path = '/tmp/shot1.png'
+                image = Image.open(image_path)
 
-                from dotenv import load_dotenv
-                load_dotenv()
 
-                async def main():
-                    agent = Agent(
-                        task="{command}",
-                        llm=ChatOpenAI(model="gpt-4o"),
-                    )
-                    result = await agent.run()
-                    print(result)
+                box_overlay_ratio = max(image.size) / 3200
+                draw_bbox_config = {
+                    'text_scale': 0.8 * box_overlay_ratio,
+                    'text_thickness': max(int(2 * box_overlay_ratio), 1),
+                    'text_padding': max(int(3 * box_overlay_ratio), 1),
+                    'thickness': max(int(3 * box_overlay_ratio), 1),
+                }
+                BOX_TRESHOLD = 0.05
 
-                asyncio.run(main())
+                import time
+                start = time.time()
+                ocr_bbox_rslt, is_goal_filtered = check_ocr_box(image_path, display_img = False, output_bb_format='xyxy', goal_filtering=None, easyocr_args={'paragraph': False, 'text_threshold':0.9}, use_paddleocr=True)
+                text, ocr_bbox = ocr_bbox_rslt
+                cur_time_ocr = time.time() 
+
+                dino_labled_img, label_coordinates, parsed_content_list = get_som_labeled_img(image_path, som_model, BOX_TRESHOLD = BOX_TRESHOLD, output_coord_in_ratio=True, ocr_bbox=ocr_bbox,draw_bbox_config=draw_bbox_config, caption_model_processor=caption_model_processor, ocr_text=text,use_local_semantics=True, iou_threshold=0.7, scale_img=False, batch_size=128)
+                cur_time_caption = time.time()
+
+                dino_labled_img, label_coordinates, parsed_content_list
             '''))
 
 # /////////////////////
@@ -106,13 +126,16 @@ def _youtube_url_code(url: str):
         code = url.split("v=")[-1]
     return url, code
 
-def youtube_download(url: str):
+def youtube_download(url: str, output: str = None):
     """download youtube video.
     $ blob yt-get <youtube id or url>
     """
     url, code = _youtube_url_code(url)
+    params = []
+    if output:
+        params.append(f"-o {output}")
 
-    uvx yt-dlp f"{url}"
+    uvx yt-dlp @(params) f"{url}"
 
 yt_get = youtube_download
 
@@ -124,6 +147,29 @@ def youtube_get_audio(url: str, format: str = 'mp3'):
     uvx yt-dlp -x --audio-format f'{format}' f'{url}'
 
 yt_au = youtube_get_audio
+
+def youtube_subtitles(url: str, /, *, lang: str = 'en'):
+    '''download subtitles from youtube
+    $ blob yt-sub <youtube id or url> <lang=en>
+    '''
+    uv pip install webvtt-py yt-dlp
+
+    import webvtt
+    from pathlib import Path
+
+    url, code = _youtube_url_code(url)
+
+    if not Path(f'/tmp/{code}.{lang}.vtt').exists():
+        yt-dlp --skip-download --write-auto-sub --sub-lang f'{lang}' -o f'/tmp/{code}' f'{url}'
+
+    captions = webvtt.read(f'/tmp/{code}.{lang}.vtt')
+    lines = [line for caption in captions for line in caption.text.split('\n') if line.strip()] + ['']
+
+    deduped = [l for i, l in enumerate(lines) if i == 0 or l != lines[i - 1]]
+
+    print('\n'.join(deduped))
+
+yt_sub = youtube_subtitles
 
 # /////////////
 # //// STT ////
@@ -137,10 +183,8 @@ def whisper_cpp(file):
     wget --continue https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
     ffmpeg -y -i @(file) -ar 16000 /tmp/recog.wav 2>/dev/null
 
-    uv run \
-        --with whisper-cpp-python \
-        --python=3.12 \
-            python -c @(_dedent(f'''
+    uv pip install whisper-cpp-python
+
                 import os
                 import pkgutil
                 from pathlib import Path
@@ -151,16 +195,16 @@ def whisper_cpp(file):
                     whisper_path = Path(package.path)
                     old = whisper_path.parent / "whisper_cpp.py"
                     new = old.read_text().replace(
-                        'elif sys.platform == "darwin":\\n        lib_ext = ".so"',
-                        'elif sys.platform == "darwin":\\n        lib_ext = ".dylib"',
+            'elif sys.platform == "darwin":\n        lib_ext = ".so"',
+            'elif sys.platform == "darwin":\n        lib_ext = ".dylib"',
                     )
                     old.write_text(new)
+        print("whisper_cpp.py updated")
                 import whisper_cpp_python
                 from whisper_cpp_python import Whisper
                 whisper = Whisper(model_path="/tmp/ggml-tiny.bin")
                 output = whisper.transcribe(open('recog.wav', 'rb'))
                 print(output['text'])
-            '''))
 
 def whisper_mlx(file):  # not tested
     ''' Recognize audio
@@ -175,32 +219,54 @@ def whisper_mlx(file):  # not tested
 # //// TTS ////
 # /////////////
 
+def kokoro_onnx(lang="en-us", speed=1.0):
+    ''' Text to speech using Kokoro model.
+    $ echo 'this is a text' | blob kokoro-onnx
+    '''
+    # https://github.com/thewh1teagle/kokoro-onnx
+    cd /tmp
+    wget --continue https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx
+    wget --continue https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin
+
+    uv pip install soundfile kokoro-onnx
+
+    import soundfile as sf
+    from kokoro_onnx import Kokoro
+    import subprocess
+    import sys
+
+    text = sys.stdin.read()
+
+    kokoro = Kokoro("kokoro-v1.0.onnx", "voices-v1.0.bin")
+    # af_heart af_sarah ...
+    samples, sample_rate = kokoro.create(text, voice="af_heart", speed=1.0, lang=lang)
+    sf.write("_.wav", samples, sample_rate)
+    print("_.wav generated")
+    play('_.wav')
+
 def kokoro(speed=1):
     """
     $ echo 'this is a text' | blob kokoro 
     """
     # https://huggingface.co/hexgrad/Kokoro-82M#usage
-    # FIXME afplay is for mac
+    
+    uv pip install kokoro soundfile
     cd /tmp
-    uv run \
-        --with kokoro \
-        --with soundfile \
-        python -c @(_dedent(f'''
+
             from kokoro import KPipeline
             import soundfile as sf
             import sys
-            import subprocess
 
             text = sys.stdin.buffer.read().decode('utf8', errors="replace")
 
             # 'a': 'American English', 'b': 'British English', 'e': 'es', 'f': 'fr-fr', 'h': 'hi', 'i': 'it', 
             # 'p': 'pt-br', 'j': 'Japanese', 'z': 'Mandarin Chinese'
-            pipeline = KPipeline(lang_code='a')
+    pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
 
             generator = pipeline(
                 text,
                 voice='af_heart',  # <= change voice here
-                speed={speed}, split_pattern=r'\\n\\n\\n+'
+        speed=speed, split_pattern=r'\n\n\n+'
             )
             p = None
             for i, (gs, ps, audio) in enumerate(generator):
@@ -208,9 +274,9 @@ def kokoro(speed=1):
                 print(i)  # i => index
                 print(gs) # gs => graphemes/text
                 # print(ps) # ps => phonemes
-                sf.write(f'_.wav', audio, 24000)
-                p = subprocess.Popen(['afplay', f'_.wav'])
-        '''))
+        sf.write('_.wav', audio, 24000)
+        
+        play('_.wav')
 
 # ///////////////////
 # //// FRONTENDS ////
@@ -224,7 +290,11 @@ def openwebui():
 # //// SEMANTIC COMMANDS ////
 # ///////////////////////////
 
+if _PLATFORM == 'darwin':
+    say = read = tts = kokoro_onnx
+else:
 say = read = tts = kokoro
+
 stt = whisper_cpp
 
 def describe(prompt, image):
