@@ -185,26 +185,27 @@ def whisper_cpp(file):
 
     uv pip install whisper-cpp-python
 
-                import os
-                import pkgutil
-                from pathlib import Path
-                try:  # TODO this can be removed once the package is updated
-                    import whisper_cpp_python
-                except FileNotFoundError:
-                    package = pkgutil.get_loader("whisper_cpp_python")
-                    whisper_path = Path(package.path)
-                    old = whisper_path.parent / "whisper_cpp.py"
-                    new = old.read_text().replace(
+    import os
+    import pkgutil
+    from pathlib import Path
+    try:  # TODO this can be removed once the package is updated
+        import whisper_cpp_python
+    except FileNotFoundError:
+        package = pkgutil.get_loader("whisper_cpp_python")
+        whisper_path = Path(package.path)
+        old = whisper_path.parent / "whisper_cpp.py"
+        new = old.read_text().replace(
             'elif sys.platform == "darwin":\n        lib_ext = ".so"',
             'elif sys.platform == "darwin":\n        lib_ext = ".dylib"',
-                    )
-                    old.write_text(new)
+        )
+        old.write_text(new)
         print("whisper_cpp.py updated")
-                import whisper_cpp_python
-                from whisper_cpp_python import Whisper
-                whisper = Whisper(model_path="/tmp/ggml-tiny.bin")
-                output = whisper.transcribe(open('recog.wav', 'rb'))
-                print(output['text'])
+
+    import whisper_cpp_python
+    from whisper_cpp_python import Whisper
+    whisper = Whisper(model_path="/tmp/ggml-tiny.bin")
+    output = whisper.transcribe(open('recog.wav', 'rb'))
+    print(output['text'])
 
 def whisper_mlx(file):  # not tested
     ''' Recognize audio
@@ -253,27 +254,27 @@ def kokoro(speed=1):
     uv pip install kokoro soundfile
     cd /tmp
 
-            from kokoro import KPipeline
-            import soundfile as sf
-            import sys
+    from kokoro import KPipeline
+    import soundfile as sf
+    import sys
 
-            text = sys.stdin.buffer.read().decode('utf8', errors="replace")
+    text = sys.stdin.buffer.read().decode('utf8', errors="replace")
 
-            # 'a': 'American English', 'b': 'British English', 'e': 'es', 'f': 'fr-fr', 'h': 'hi', 'i': 'it', 
-            # 'p': 'pt-br', 'j': 'Japanese', 'z': 'Mandarin Chinese'
+    # 'a': 'American English', 'b': 'British English', 'e': 'es', 'f': 'fr-fr', 'h': 'hi', 'i': 'it', 
+    # 'p': 'pt-br', 'j': 'Japanese', 'z': 'Mandarin Chinese'
     pipeline = KPipeline(lang_code='a', repo_id='hexgrad/Kokoro-82M')
 
-            generator = pipeline(
-                text,
-                voice='af_heart',  # <= change voice here
+    generator = pipeline(
+        text,
+        voice='af_heart',  # <= change voice here
         speed=speed, split_pattern=r'\n\n\n+'
-            )
-            p = None
-            for i, (gs, ps, audio) in enumerate(generator):
-                p and p.wait()
-                print(i)  # i => index
-                print(gs) # gs => graphemes/text
-                # print(ps) # ps => phonemes
+    )
+    p = None
+    for i, (gs, ps, audio) in enumerate(generator):
+        p and p.wait()
+        print(i)  # i => index
+        print(gs) # gs => graphemes/text
+        # print(ps) # ps => phonemes
         sf.write('_.wav', audio, 24000)
         
         play('_.wav')
@@ -293,7 +294,7 @@ def openwebui():
 if _PLATFORM == 'darwin':
     say = read = tts = kokoro_onnx
 else:
-say = read = tts = kokoro
+    say = read = tts = kokoro
 
 stt = whisper_cpp
 
