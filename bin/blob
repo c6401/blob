@@ -69,8 +69,8 @@ def omni(url='https://github.com/microsoft/OmniParser/blob/master/requirements.t
 
     cd /tmp
     # '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless --screenshot=/tmp/shot1.png f'{url}'
+
     uv run \
-        --python=3.12 \
         --with Pillow \
         --with 'git+https://github.com/microsoft/OmniParser/tree/master' \
         --no-project --with-requirements requirements.txt \
@@ -200,8 +200,8 @@ def whisper_cpp(file):
         )
         old.write_text(new)
         print("whisper_cpp.py updated")
+        import whisper_cpp_python
 
-    import whisper_cpp_python
     from whisper_cpp_python import Whisper
     whisper = Whisper(model_path="/tmp/ggml-tiny.bin")
     output = whisper.transcribe(open('recog.wav', 'rb'))
@@ -286,6 +286,81 @@ def kokoro(speed=1):
 def openwebui():
     uvx --python 3.11 open-webui serve
 
+# ///////////////////
+# //// RECORDING ////
+# ///////////////////
+
+def record(output_file='/tmp/recording.wav', sample_rate=16000, silence_threshold=1000, silence_duration=2.0):
+    '''Record audio from microphone with silence detection
+    $ blob record  # Record until silence is detected
+    $ blob record --silence_threshold=500  # More sensitive silence detection
+    '''
+    # brew install portaudio
+    cd /tmp
+    uv pip install pyaudio numpy
+
+    import pyaudio, wave, sys, numpy as np, time
+    
+    CHUNK = 1024
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 1
+    RATE = sample_rate
+    SILENCE_THRESHOLD = silence_threshold  # Adjust this value based on your environment
+    SILENCE_DURATION = silence_duration  # Silence duration in seconds before stopping
+    
+    p = pyaudio.PyAudio()
+    
+    stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
+    
+    print("Recording... (Ctrl+C to stop)")
+    
+    frames = []
+    silent_chunks = 0
+    max_silent_chunks = int(SILENCE_DURATION * RATE / CHUNK)
+    started_recording = False
+    start_time = time.time()
+
+    try:
+        while True:
+            data = stream.read(CHUNK)
+            frames.append(data)
+
+            audio_data = np.frombuffer(data, dtype=np.int16)
+            volume = np.abs(audio_data).mean()
+
+            # Print volume level for debugging
+            bars = int(50 * volume / SILENCE_THRESHOLD) 
+            bars = min(bars, 50)  # Cap at 50 characters
+            print(f"Volume: {volume:.0f} {'|' * bars}{' ' * (50-bars)}\r", end="")
+
+            # Silence detection logic
+            if volume < SILENCE_THRESHOLD:
+                silent_chunks += 1
+                if silent_chunks > max_silent_chunks and started_recording:
+                    print("\\nSilence detected, stopping recording.")
+                    break
+            else:
+                silent_chunks = 0
+                started_recording = True
+
+    except KeyboardInterrupt:
+        print("\nRecording stopped by user")
+
+    print("Recording complete.")
+
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    # Save the recorded audio
+    wf = wave.open("{output_file}", 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(p.get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(b''.join(frames))
+    wf.close()
+
+    print(f"Audio saved to {output_file}")
 
 # ///////////////////////////
 # //// SEMANTIC COMMANDS ////
