@@ -30,11 +30,11 @@ def play(file):
     $ blob play <file>
     '''
     if _PLATFORM == 'darwin':
-        afplay @(file)
+        return subprocess.Popen(['afplay', file])
     elif _PLATFORM == 'linux':
-        aplay @(file)
+        return subprocess.Popen(['aplay', file])
     elif _PLATFORM == 'windows':
-        powershell -c f"(New-Object Media.SoundPlayer {file}).PlaySync()"
+        return subprocess.Popen(['powershell', '-c', f'(New-Object Media.SoundPlayer {file}).PlaySync()'])
 
 # ///////////////////////
 # //// VISUAL MODELS ////
@@ -277,7 +277,7 @@ def kokoro(speed=1):
         # print(ps) # ps => phonemes
         sf.write('_.wav', audio, 24000)
         
-        play('_.wav')
+        p = play('_.wav')
 
 # ///////////////////
 # //// FRONTENDS ////
