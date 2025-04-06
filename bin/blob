@@ -5,6 +5,7 @@ __import__('warnings').filterwarnings("ignore")
 
 import fire as _fire
 import platform as _platform
+import subprocess
 from textwrap import dedent as _dedent
 
 _PLATFORM = _platform.system().lower()
@@ -35,6 +36,25 @@ def play(file):
         return subprocess.Popen(['aplay', file])
     elif _PLATFORM == 'windows':
         return subprocess.Popen(['powershell', '-c', f'(New-Object Media.SoundPlayer {file}).PlaySync()'])
+
+def list():
+    models = []
+    models.extend((i[17:], '~/.cache/torch/sentence_transformers/') for i in $(ls ~/.cache/torch/sentence_transformers).split('\n'))
+    models.extend((i, '~/Library/Application Support/io.datasette.llm/llama-cpp/models/') for i in $(ls "~/Library/Application Support/io.datasette.llm/llama-cpp/models").split('\n'))
+    models.extend((i, '~/Library/Application Support/io.datasette.llm/gguf/models/') for i in $(ls "~/Library/Application Support/io.datasette.llm/gguf/models").split('\n'))
+    models.extend((i[8:], '~/.cache/huggingface/hub/') for i in $(ls ~/.cache/huggingface/hub).split('\n'))
+    models.extend((i, '~/.cache/gpt4all/') for i in $(ls ~/.cache/gpt4all).split('\n'))
+    models.extend((i, '~/.cache/lm-studio/models/') for i in $(ls ~/.cache/lm-studio/models).split('\n'))
+    models.extend((i.rsplit('/', 1)[-1], '~/Downloads/') for i in $(ls ~/Downloads/*.llamafile).split('\n'))
+
+    known = 'llama phi mistral whisper qwen'.split()
+    models.sort(key=lambda x: x[0].lower())
+    models.sort(key=lambda x: next((n for n, i in enumerate(known) if i in x[0]), len(known)))
+
+    for model in models:
+        if not model[0]:
+            continue
+        print(f'{model[0]:<50}', model[1])
 
 # ///////////////////////
 # //// VISUAL MODELS ////
