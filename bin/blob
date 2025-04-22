@@ -299,6 +299,20 @@ def kokoro(speed=1):
         
         p = play('_.wav')
 
+def coqui_list():
+    uv run --python=3.10 --with TTS tts --list_models
+
+def coqui(ln='en-us', speed=1.0):
+    # https://github.com/coqui-ai/TTS
+    # uv run --python=3.10 --with TTS tts --list_models
+    import sys
+    text = sys.stdin.read()
+    model_arg = '--model_name=tts_models/en/ljspeech/tacotron2-DDC'
+    if ln == 'pt':
+        model_arg = '--model_name=tts_models/pt/cv/vits'
+    uv run --python=3.10 --with TTS tts --out_path /tmp/output.wav @(model_arg) --text f"{text}" 
+    play('/tmp/output.wav')
+
 # ///////////////////
 # //// FRONTENDS ////
 # ///////////////////
