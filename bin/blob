@@ -199,11 +199,12 @@ def whisper_cpp(file):
     ''' Recognize audio
     $ blob whisper-cpp <file>
     '''
+    # brew install cmake
     cd /tmp
     wget --continue https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
     ffmpeg -y -i @(file) -ar 16000 /tmp/recog.wav 2>/dev/null
 
-    uv pip install whisper-cpp-python
+    env CMAKE_POLICY_VERSION_MINIMUM=3.5 uv pip install whisper-cpp-python 2>/dev/null
 
     import os
     import pkgutil
@@ -223,8 +224,10 @@ def whisper_cpp(file):
         import whisper_cpp_python
 
     from whisper_cpp_python import Whisper
+
     whisper = Whisper(model_path="/tmp/ggml-tiny.bin")
-    output = whisper.transcribe(open('recog.wav', 'rb'))
+
+    output = whisper.transcribe(open(file, 'rb'), language='pt')
     print(output['text'])
 
 def whisper_mlx(file):  # not tested
